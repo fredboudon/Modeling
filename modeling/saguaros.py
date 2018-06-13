@@ -2,9 +2,8 @@
 # %gui qt4
 # import gui
 
-import openalea.plantgl.all as pgl
-from gui import *
-from tree import *
+from modeling.gui import *
+from modeling.tree import *
 
 nbsaguaro = 1
 
