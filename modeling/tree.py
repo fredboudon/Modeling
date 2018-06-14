@@ -117,3 +117,7 @@ def skeleton(scene, threshold=0.1):
             result.append(geometry.axis)
     result = pgl.PointSet(result)
     return result
+
+
+def load_pointset(path):
+    return array(loadtxt(path))

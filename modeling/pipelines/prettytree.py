@@ -2,8 +2,7 @@
 # %gui qt4
 # import gui
 
-from modeling.gui import *
-from modeling.tree import *
+from modeling import *
 
 nbtree = 1
 
@@ -28,7 +27,7 @@ for i in range(nbtree):
     show(scan)
     show(skel, width=3, color=green)
 
-    bbx = pgl.BoundingBox(tree)
+    #bbx = pgl.BoundingBox(tree)
 
 
 
