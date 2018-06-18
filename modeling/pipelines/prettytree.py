@@ -12,7 +12,7 @@ for i in range(nbtree):
 
     ### CONSTRUCTION ###
 
-    tree = createprettytree()[1]
+    tree = createprettytree()
 
     show(tree)
 

@@ -1,6 +1,5 @@
-from numpy import *
 from openalea.lpy import Lsystem
-import openalea.plantgl.all as pgl
+from modeling.gui import *
 import random
 
 
@@ -8,7 +7,8 @@ def createprettytree():
     lsys = Lsystem("/home/fournierr/anaconda3/envs/moddeling/lib/python2.7/site-packages/OpenAlea.Lpy-2.7.1-py2.7-linux-x86_64.egg/share/tutorial/04 - simple-plant-archi/02 - random-tree.lpy")
     lstring = lsys.iterate()
     lscene = lsys.sceneInterpretation(lstring)
-    return lstring, lscene
+    # return lstring, lscene
+    return lscene
 
 
 # return a lstring and a scene of a basic tree
@@ -20,11 +20,12 @@ def createsaguaro(derivlength=15, trunc_rad=0.2, trunc_length=5, elasticity=0.05
     lsys.addRule("B --> nF(" + str(B_1) + "," + str(B_2) + ") B")
     lstring = lsys.iterate()
     lscene = lsys.sceneInterpretation(lstring)
-    return lstring, lscene
+    # return lstring, lscene
+    return lscene
 
 
 # return a PointSet of a simulated scan of the tree
-def lidarscan(scene, a=90, z=2):
+def lidarscan(scene, a=90, z=1):
     pgl.Viewer.display(scene)
     sc = pgl.Viewer.getCurrentScene()
     bbx = pgl.BoundingBox(sc)
@@ -95,7 +96,7 @@ def isincylinder(p, base, dir, radius, height):
 
 
 # return a PointSet of the skeleton of the tree
-def skeleton(scene, threshold=0.1):
+def skeleton(scene, threshold=0.01):
     result = []
     for shape in scene:
         position = pgl.Vector3(0,0,0)
@@ -121,3 +122,22 @@ def skeleton(scene, threshold=0.1):
 
 def load_pointset(path):
     return array(loadtxt(path))
+
+
+def getbbx(scene):
+    bbx = pgl.BoundingBox(scene)
+    return bbx.lowerLeftCorner, bbx.upperRightCorner
+
+def assemble(pathtree, pathresult):
+
+    tree = load_pointset(pathtree)
+
+    pred = load_pointset(pathresult)
+
+    bbx = getbbx(pgl.PointSet(tree))
+    pos = - ((bbx[0] + bbx[1]) / 2)
+
+    res_tree = move(pgl.PointSet(tree), position=pos)
+    res_result = move(pgl.PointSet(pred), position=pos)
+
+    return res_tree, res_result

@@ -40,7 +40,7 @@ for i in range(nbsaguaro):
 
     #saguaro = createsaguaro(derivlength=derivlength, trunc_rad=trunc_rad, trunc_length=trunc_length, elasticity=elasticity, A_1=A_1, branch_rad=branch_rad, rotation=rotation, B_1=B_1, B_2=B_2)[1]
 
-    saguaro = createsaguaro(derivlength=10, trunc_rad=0.25, trunc_length=3, elasticity=0.05, A_1=80, branch_rad=0.15, rotation=137.5, B_1=0.8, B_2=0.1)[1]
+    saguaro = createsaguaro(derivlength=10, trunc_rad=0.25, trunc_length=3, elasticity=0.05, A_1=80, branch_rad=0.15, rotation=137.5, B_1=0.8, B_2=0.1)
 
 
     show(saguaro)
@@ -60,7 +60,7 @@ for i in range(nbsaguaro):
 
 
 
-    ## DATA TRANSFER ###
+    ### DATA TRANSFER ###
 
     #name = "_".join(map(str, [derivlength, trunc_rad, trunc_length, elasticity, A_1, branch_rad, rotation, B_1, B_2]))
     #directory = "/home/fournierr/Documents/Stage CIRAD/data/saguaros_2/"

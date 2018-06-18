@@ -36,7 +36,7 @@ def clear():
 def move(pointset, position=0, zoom=1):
     ps = []
     for p in pointset.pointList:
-        p = pgl.Vector3(multiply(p, zoom) + position)
+        p = multiply(p, zoom) + position
         ps.append(p)
     return pgl.PointSet(ps)
 
