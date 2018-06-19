@@ -1,27 +1,5 @@
-from openalea.lpy import Lsystem
-from modeling.gui import *
-import random
-
-
-def createprettytree():
-    lsys = Lsystem("/home/fournierr/anaconda3/envs/moddeling/lib/python2.7/site-packages/OpenAlea.Lpy-2.7.1-py2.7-linux-x86_64.egg/share/tutorial/04 - simple-plant-archi/02 - random-tree.lpy")
-    lstring = lsys.iterate()
-    lscene = lsys.sceneInterpretation(lstring)
-    # return lstring, lscene
-    return lscene
-
-
-# return a lstring and a scene of a basic tree
-def createsaguaro(derivlength=15, trunc_rad=0.2, trunc_length=5, elasticity=0.05, A_1=80, branch_rad=0.1, rotation=137.5, B_1=0.8, B_2=0.1):
-    lsys = Lsystem()
-    lsys.axiom = "_(" + str(trunc_rad) + ") F(" + str(trunc_length) + ") @Ts(" + str(elasticity) + ")  A"
-    lsys.derivationLength = derivlength
-    lsys.addRule("A --> [ ^(" + str(A_1) + ") _(" + str(branch_rad) + ") B] /(" + str(rotation) + ") F A")
-    lsys.addRule("B --> nF(" + str(B_1) + "," + str(B_2) + ") B")
-    lstring = lsys.iterate()
-    lscene = lsys.sceneInterpretation(lstring)
-    # return lstring, lscene
-    return lscene
+import openalea.plantgl.all as pgl
+from numpy import *
 
 
 # return a PointSet of a simulated scan of the tree
@@ -118,26 +96,3 @@ def skeleton(scene, threshold=0.01):
             result.append(geometry.axis)
     result = pgl.PointSet(result)
     return result
-
-
-def load_pointset(path):
-    return array(loadtxt(path))
-
-
-def getbbx(scene):
-    bbx = pgl.BoundingBox(scene)
-    return bbx.lowerLeftCorner, bbx.upperRightCorner
-
-def assemble(pathtree, pathresult):
-
-    tree = load_pointset(pathtree)
-
-    pred = load_pointset(pathresult)
-
-    bbx = getbbx(pgl.PointSet(tree))
-    pos = - ((bbx[0] + bbx[1]) / 2)
-
-    res_tree = move(pgl.PointSet(tree), position=pos)
-    res_result = move(pgl.PointSet(pred), position=pos)
-
-    return res_tree, res_result

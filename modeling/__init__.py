@@ -1,4 +1,6 @@
 from numpy import *
 
 from gui import *
-from tree import *
+from trees import *
+from extraction import *
+from pointsets import *

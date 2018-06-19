@@ -33,14 +33,6 @@ def clear():
     update()
 
 
-def move(pointset, position=0, zoom=1):
-    ps = []
-    for p in pointset.pointList:
-        p = multiply(p, zoom) + position
-        ps.append(p)
-    return pgl.PointSet(ps)
-
-
 def start():
     pgl.Viewer.start()
 
