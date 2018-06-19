@@ -1,0 +1,18 @@
+import random
+
+derivlength = random.randint(8, 12)
+trunc_rad = float(random.randint(20, 30)) / 100
+trunc_length = random.randint(3, 5)
+elasticity = float(random.randint(10, 50)) / 1000
+branch_rad = float(random.randint(10, 20)) / 100
+rotation = random.randint(100, 150)
+
+
+Axiom: _(trunc_rad) F(trunc_length ) @Ts(elasticity)  A
+
+derivation length: derivlength
+
+production:
+A --> [ ^(80) _(branch_rad) B] /(rotation) F A
+B :
+  produce nF(0.8,0.1) B
