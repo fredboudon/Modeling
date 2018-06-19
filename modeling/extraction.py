@@ -2,7 +2,7 @@ import openalea.plantgl.all as pgl
 from numpy import *
 
 
-# return a PointSet of a simulated scan of the tree
+# return a PointSet of a simulated LIDAR scan of the tree (ZBuffer points from different angles)
 def lidarscan(scene, a=90, z=1):
     pgl.Viewer.display(scene)
     sc = pgl.Viewer.getCurrentScene()
@@ -19,7 +19,7 @@ def lidarscan(scene, a=90, z=1):
     return pts
 
 
-# return a PointSet of a filled tree
+# return a PointSet of the "filled" tree (random points inside the tree)
 def filledscan(scene, density):
     result = []
     for shape in scene:
@@ -44,7 +44,7 @@ def filledscan(scene, density):
     return result
 
 
-# return a PointSet of a filled tree
+# return a PointSet of the "emptied" tree (random points on the surface of the tree)
 def surfacescan(scene, density):
     result = []
     for shape in scene:
@@ -67,10 +67,6 @@ def surfacescan(scene, density):
             result.append(geometry.axis)
     result = pgl.PointSet(result)
     return result
-
-
-def isincylinder(p, base, dir, radius, height):
-    return 0 <= dot(p - base, pgl.Vector3(dir).normed()) <= height and pgl.norm(cross(p - base, pgl.Vector3(dir).normed())) < radius
 
 
 # return a PointSet of the skeleton of the tree
@@ -96,3 +92,8 @@ def skeleton(scene, threshold=0.01):
             result.append(geometry.axis)
     result = pgl.PointSet(result)
     return result
+
+
+# check if a point is contained in a cylinder
+def isincylinder(point, base, dir, radius, height):
+    return 0 <= dot(point - base, pgl.Vector3(dir).normed()) <= height and pgl.norm(cross(point - base, pgl.Vector3(dir).normed())) < radius
