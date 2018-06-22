@@ -2,9 +2,22 @@ from numpy import *
 import openalea.plantgl.all as pgl
 
 
-# load a pintset from trxt file
-def load_pointset(path):
-    return array(loadtxt(path))
+# convert an object or a path to txt or bgeom scene to a pointset
+def topointset(obj):
+    pointset = pgl.Scene(obj)[0] if isinstance(obj, str) else pgl.PointSet(obj)
+    while not isinstance(pointset, pgl.PointSet):
+        pointset = pointset.geometry
+    return pointset
+
+
+# convert multiple objects to pointsets
+def topointsets(objs):
+    return [topointset(obj) for obj in objs]
+
+
+# save a scene to the indicated path (.txt, .xyz, .bgeom)
+def save(scene, path):
+    scene.save(path)
 
 
 # return the boundingbox of a scene
@@ -13,21 +26,41 @@ def getbbx(scene):
     return bbx.lowerLeftCorner, bbx.upperRightCorner
 
 
-# move a result pointset to the same position as its origin pointset
-def assemble(pathtree, pathresult):
-    tree = load_pointset(pathtree)
-    pred = load_pointset(pathresult)
-    bbx = getbbx(pgl.PointSet(tree))
-    pos = - ((bbx[0] + bbx[1]) / 2)
-    res_tree = move(pgl.PointSet(tree), position=pos)
-    res_result = move(pgl.PointSet(pred), position=pos)
-    return res_tree, res_result
+# return the dimensions of a scene
+def getdims(scene):
+    bbx = getbbx(scene)
+    return bbx[1] - bbx[0]
 
 
-# move (and potentially zoom) a pointset to a given position
-def move(pointset, position=0, zoom=1):
-    ps = []
-    for p in pointset.pointList:
-        p = multiply(p, zoom) + position
-        ps.append(p)
-    return pgl.PointSet(ps)
+# move a pointset to a given position
+def move(pointset, position):
+    return pgl.PointSet(array(pointset.pointList) - getbbx(pointset)[0] + position)
+
+
+# zoom a pointset to a given position
+def zoom(pointset, zoom):
+    position = getbbx(pointset)[0]
+    return pgl.PointSet((array(pointset.pointList) - position) * zoom + position)
+
+
+# zoom a pointset so it occupies the maximum possible space in the indicated bbx
+def scale(pointset, bbx):
+    dims, psdims = bbx[1] - bbx[0], getdims(pointset)
+    return zoom(pointset, min(divide(dims, psdims)))
+
+
+# deform a pointset to perfectly fit in the indicated bbx
+def fit(pointset, bbx):
+    dims, psdims = bbx[1] - bbx[0], getdims(pointset)
+    return zoom(pointset, divide(dims, psdims))
+
+
+# center a pointset
+def center(pointset):
+    return move(pointset, position=-getbbx(pointset)[0])
+
+
+# center and scale the pointsets to the bbx
+def assemble(pointsets):
+    position = getbbx(pointsets[0])[0]
+    return [move(pointset, position) for pointset in pointsets]

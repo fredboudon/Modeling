@@ -1,11 +1,12 @@
 # before running:
 # %gui qt4
-# import gui
+# import modeling.gui
+
 
 from modeling import *
 
 
-nbsaguaro = 1
+nbsaguaro = 10
 
 for i in range(nbsaguaro):
 

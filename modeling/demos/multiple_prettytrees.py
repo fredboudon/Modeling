@@ -1,6 +1,6 @@
 # before running:
 # %gui qt4
-# import gui
+# import modeling.gui
 
 from modeling import *
 

@@ -9,13 +9,19 @@ black, blue, cyan, green, red, white, yellow = pgl.Color4.BLACK, pgl.Color4.BLUE
 
 
 # display a pointset in the viewer
-def show(scene, color=black, width=1, clearprevious=False):
+def show(scene, color=black, width=1, clearprevious=True):
+    if clearprevious: clear()
     if isinstance(scene, pgl.PointSet):
         scene.width = width
         scene.colorList = pgl.Color4Array(full(len(scene.pointList), color, dtype=pgl.Color4))
     scenelist.append((scene.getId(), scene))
-    if clearprevious: clear()
     update()
+
+
+def show_all(scenes, colors=None, widths=None, clearprevious=True):
+    if clearprevious: clear()
+    for i, sc in enumerate(scenes):
+        show(sc, color=colors[i] if colors else black, width=widths[i] if widths else 1, clearprevious=False)
 
 
 # remove a displayed scene from the viewer
@@ -48,5 +54,4 @@ def restart():
     pgl.Viewer.stop()
 
 
-# one restart needed before using the gui
-restart()
+restart()  # 1 restart needed before using the gui
