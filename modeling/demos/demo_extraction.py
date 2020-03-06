@@ -20,4 +20,4 @@ show(skel, width=3, color=green)
 
 bbx = getbbx(tree)
 
-savez("mytree", scan=scan.pointList, skel=skel.pointList, bounds=bbx)
+savez("/home/fournierr/Documents/Stage CIRAD/data/mytree", scan=scan.pointList, skel=skel.pointList, bounds=bbx)

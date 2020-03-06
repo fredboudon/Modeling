@@ -55,5 +55,3 @@ def restart():
 
 
 restart()  # 1 restart needed before using the gui
-
-# ==============================================================================
