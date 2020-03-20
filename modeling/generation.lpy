@@ -1,0 +1,50 @@
+def End(lstring, scene):
+  if SCAN :
+    return Scene([vscan(scene)])
+
+elasticity = 0.05 if ERIGE else 0
+
+Axiom: _(0.2) F(5) @Ts(elasticity)  A
+
+derivation length: 15
+production:
+
+A --> [ ^(80) _(0.1) B] /(137.5) F A
+B :
+  if ERIGE:
+    produce nF(0.8,0.1) B
+  else:
+    produce F(2.5)
+
+interpretation:
+
+
+endlsystem
+
+from openalea.plantgl.all import *
+from numpy import *
+from math import *
+
+def vscan(scene, a = 90):
+  Viewer.display(scene)
+  sc = Viewer.getCurrentScene()
+  bbx = BoundingBox(sc)
+  c = bbx.getCenter()
+  p,h,u = Viewer.camera.getPosition()
+  pts = PointSet([],[])
+  for a in arange(0,360,a):
+    np = c + Matrix3.axisRotation((0,0,1),double(a))*Vector3(1,0,0)*norm(p-c)
+    Viewer.camera.lookAt(np,c)
+    pi, ci = Viewer.frameGL.grabZBufferPoints()
+    pts.pointList += pi
+    pts.colorList += ci
+  return pts
+###### INITIALISATION ######
+
+__lpy_code_version__ = 1.1
+
+def __initialiseContext__(context):
+	scalars = [('ERIGE', 'Bool', True), ('SCAN', 'Bool', True)]
+	context["__scalars__"] = scalars
+	for s in scalars:
+		if not s[1] == "Category" : context[s[0]] = s[2]

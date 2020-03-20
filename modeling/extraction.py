@@ -2,20 +2,25 @@ import openalea.plantgl.all as pgl
 from numpy import *
 
 
-# return a PointSet of a simulated LIDAR scan of the tree (ZBuffer points from different angles)
+# return a PointSet of a simulated LIDAR scan of the tree
+# (ZBuffer points from different angles)
 def lidarscan(scene, a=90, z=1):
     pgl.Viewer.display(scene)
     sc = pgl.Viewer.getCurrentScene()
     bbx = pgl.BoundingBox(sc)
     c = bbx.getCenter()
-    p,h,u = pgl.Viewer.camera.getPosition()
+    p, h, u = pgl.Viewer.camera.getPosition()
     pts = pgl.PointSet([], [])
-    for a in arange(0,360,a):
-        np = c + pgl.Matrix3.axisRotation((0,0,1),a)*pgl.Vector3(1,0,0)*pgl.norm(p-c)
-        pgl.Viewer.camera.lookAt(np/z,c)
+    for a in arange(0, 360, a):
+        np = (c + pgl.Matrix3.axisRotation((0, 0, 1), a)
+              * pgl.Vector3(1, 0, 0)
+              * pgl.norm(p-c))
+
+        pgl.Viewer.camera.lookAt(np / z, c)
         pi, ci = pgl.Viewer.frameGL.grabZBufferPoints()
         pts.pointList += pi
         pts.colorList += ci
+
     return pts
 
 
