@@ -28,19 +28,22 @@ def lidarscan(scene, a=90, z=1):
 def filledscan(scene, density):
     result = []
     for shape in scene:
-        position = pgl.Vector3(0,0,0)
-        heading = pgl.Vector3(0,0,1)
+        position = pgl.Vector3(0, 0, 0)
+        heading = pgl.Vector3(0, 0, 1)
         geometry = shape.geometry
         while isinstance(geometry, pgl.Transformed):
             if isinstance(geometry, pgl.Translated):
                 position = geometry.translation
             if isinstance(geometry, pgl.Oriented):
-                heading = cross(geometry.primary,geometry.secondary)
+                heading = cross(geometry.primary, geometry.secondary)
             geometry = geometry.geometry
         if isinstance(geometry, pgl.Cylinder):
             for p in range(int((pi*(geometry.radius**2)*geometry.height) // density)):
-                v = pgl.Vector3(random.rand() * 2 - 1, random.rand() * 2 - 1, random.rand() * 2 - 1)
-                pos = position + pgl.Vector3(cross(heading, v)).normed() * (geometry.radius*sqrt(random.rand()))
+                v = pgl.Vector3(random.rand() * 2 - 1,
+                                random.rand() * 2 - 1, random.rand() * 2 - 1)
+                pos = position + \
+                    pgl.Vector3(cross(heading, v)).normed() * \
+                    (geometry.radius*sqrt(random.rand()))
                 point = pos+heading*random.rand()*geometry.height
                 result.append(point)
         elif isinstance(geometry, pgl.Extrusion):
@@ -53,19 +56,21 @@ def filledscan(scene, density):
 def surfacescan(scene, density):
     result = []
     for shape in scene:
-        position = pgl.Vector3(0,0,0)
-        heading = pgl.Vector3(0,0,1)
+        position = pgl.Vector3(0, 0, 0)
+        heading = pgl.Vector3(0, 0, 1)
         geometry = shape.geometry
         while isinstance(geometry, pgl.Transformed):
             if isinstance(geometry, pgl.Translated):
                 position = geometry.translation
             if isinstance(geometry, pgl.Oriented):
-                heading = cross(geometry.primary,geometry.secondary)
+                heading = cross(geometry.primary, geometry.secondary)
             geometry = geometry.geometry
         if isinstance(geometry, pgl.Cylinder):
             for p in range(int((pi*(geometry.radius**2)*geometry.height) // density)):
-                v = pgl.Vector3(random.rand() * 2 - 1, random.rand() * 2 - 1, random.rand() * 2 - 1)
-                pos = position + pgl.Vector3(cross(heading, v)).normed() * (geometry.radius)
+                v = pgl.Vector3(random.rand() * 2 - 1,
+                                random.rand() * 2 - 1, random.rand() * 2 - 1)
+                pos = position + \
+                    pgl.Vector3(cross(heading, v)).normed() * (geometry.radius)
                 point = pos+heading*random.rand()*geometry.height
                 result.append(point)
         elif isinstance(geometry, pgl.Extrusion):
@@ -78,14 +83,14 @@ def surfacescan(scene, density):
 def skeleton(scene, threshold=0.01):
     result = []
     for shape in scene:
-        position = pgl.Vector3(0,0,0)
-        heading = pgl.Vector3(0,0,1)
+        position = pgl.Vector3(0, 0, 0)
+        heading = pgl.Vector3(0, 0, 1)
         geometry = shape.geometry
         while isinstance(geometry, pgl.Transformed):
             if isinstance(geometry, pgl.Translated):
                 position = geometry.translation
             if isinstance(geometry, pgl.Oriented):
-                heading = cross(geometry.primary,geometry.secondary)
+                heading = cross(geometry.primary, geometry.secondary)
             geometry = geometry.geometry
         if isinstance(geometry, pgl.Cylinder) or isinstance(geometry, pgl.Cone):
             line = pgl.Polyline([position, position+heading*geometry.height])

@@ -20,7 +20,41 @@ def get_geometry(sh):
         return sh
 
 
-def convert_synthetic_to_point_cloud(filename, output_dir="synthetic_tree_labeled"):
+def my_lidarscan(scene, a=90, z=1):
+    # pgl.Viewer.display(scene)
+    # sc = pgl.Viewer.getCurrentScene()
+    bbx = pgl.BoundingBox(scene)
+    c = bbx.getCenter()
+    p, h, u = pgl.Viewer.camera.getPosition()
+    pts = pgl.PointSet([], [])
+
+    # pgl.Viewer.camera.setPosition(pgl.Vector3(100, 100, 8))
+    # p, h, u = pgl.Viewer.camera.getPosition()
+    # print(p, h, u)
+    # pgl.Viewer.camera.lookAt(pgl.Vector3(100, 100, 8),
+    #                          c)
+    # pi, ci = pgl.Viewer.frameGL.grabZBufferPoints()
+    # pts.pointList += pi
+    # pts.colorList += ci
+
+    for a in arange(0, 360, a):
+        np = (c + pgl.Matrix3.axisRotation(pgl.Vector3(0, 0, 1), numpy.double(a))
+              * pgl.Vector3(1, 0, 0)
+              * pgl.norm(p-c))
+
+        print(np)
+        pgl.Viewer.camera.lookAt(np, c)
+        jitter = 0.1
+        raywidth = 2
+        pi, ci = pgl.Viewer.frameGL.grabZBufferPoints(jitter, raywidth)
+        # pi, ci = pgl.Viewer.frameGL.grabZBufferPoints()
+        pts.pointList += pi
+        pts.colorList += ci
+
+    return pts
+
+
+def convert_synthetic_to_point_cloud(filename, output_filename):
 
     black = Material((0, 0, 0))
     red = Material((255, 0, 0))
@@ -51,9 +85,9 @@ def convert_synthetic_to_point_cloud(filename, output_dir="synthetic_tree_labele
 
     Viewer.grids.set(False, False, False, False)
 
-    # pgl.Viewer.display(black_scene)
+    pgl.Viewer.display(black_scene)
 
-    scan = lidarscan(black_scene)
+    scan = my_lidarscan(black_scene)
 
     pts = numpy.array(scan.pointList)
     colors = numpy.array([(c.red, c.green, c.blue) for c in scan.colorList])
@@ -64,32 +98,43 @@ def convert_synthetic_to_point_cloud(filename, output_dir="synthetic_tree_labele
 
     number_apple_point = numpy.count_nonzero(label)
 
-    if not os.path.exists(output_dir): os.mkdir(output_dir)
-    basename = os.path.basename(os.path.splitext(filename)[0])
-    output_filename = os.path.join(output_dir, "{}.txt".format(basename))
     numpy.savetxt(output_filename, data)
 
     return number_of_apple, number_apple_point
 
 
+"""
+
+ipython
+%gui qt
+from openalea.plantgl.all import *
+Viewer.display(Scene())
+%run syn...
+"""
+
+
 if __name__ == "__main__":
 
-    input_dir = "/home/artzet_s/code/dataset/synthetic_MAppleT/1996_9"
-    output_dir = "/home/artzet_s/code/dataset/synthetic_lidar_simulation"
+    input_dir = "/home/artzet_s/code/dataset/synthetic_data/synthetic_MAppleT/1996_9"
+    output_dir = "/home/artzet_s/code/dataset/synthetic_data/synthetic_lidar_simulation_noised"
+    recompute = False
 
     Viewer.grids.set(False, False, False, False)
 
-    if not os.path.exists(output_dir): os.mkdir(output_dir)
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
 
     d = collections.defaultdict(list)
     for filename in glob.glob("{}/*.bgeom".format(input_dir)):
+        basename = os.path.basename(os.path.splitext(filename)[0])
+        output_filename = os.path.join(output_dir, "{}.txt".format(basename))
 
-        data = convert_synthetic_to_point_cloud(filename,
-                                                output_dir=output_dir)
+        if not os.path.exists(output_filename) or recompute:
+            data = convert_synthetic_to_point_cloud(filename, output_filename)
 
-        d['basename'].append(os.path.basename(os.path.splitext(filename)[0]))
-        d['number_of_apple'].append(data[0])
-        d['number_apple_point'].append(data[1])
+    # d['basename'].append(os.path.basename(os.path.splitext(filename)[0]))
+    # d['number_of_apple'].append(data[0])
+    # d['number_apple_point'].append(data[1])
 
-    df = pandas.DataFrame(d)
-    df.to_csv(os.path.join(output_dir, "synthetic_tree_apple_number.csv"))
+    # df = pandas.DataFrame(d)
+    # df.to_csv(os.path.join(output_dir, "synthetic_tree_apple_number.csv"))
