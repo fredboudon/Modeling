@@ -54,7 +54,7 @@ def my_lidarscan(scene, a=90, z=1):
     return pts
 
 
-def convert_synthetic_to_point_cloud(filename, output_dir="synthetic_tree_labeled"):
+def convert_synthetic_to_point_cloud(filename, output_filename):
 
     black = Material((0, 0, 0))
     red = Material((255, 0, 0))
@@ -67,9 +67,6 @@ def convert_synthetic_to_point_cloud(filename, output_dir="synthetic_tree_labele
                                     shape.appearance,
                                     shape.id,
                                     shape.parentId))
-
-    Viewer.display(cleaned_scene)
-    return None
 
     black_scene = Scene()
     for shape in cleaned_scene:
@@ -101,10 +98,6 @@ def convert_synthetic_to_point_cloud(filename, output_dir="synthetic_tree_labele
 
     number_apple_point = numpy.count_nonzero(label)
 
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-    basename = os.path.basename(os.path.splitext(filename)[0])
-    output_filename = os.path.join(output_dir, "{}.txt".format(basename))
     numpy.savetxt(output_filename, data)
 
     return number_of_apple, number_apple_point
@@ -123,7 +116,8 @@ Viewer.display(Scene())
 if __name__ == "__main__":
 
     input_dir = "/home/artzet_s/code/dataset/synthetic_data/synthetic_MAppleT/1996_9"
-    output_dir = "/home/artzet_s/code/dataset/synthetic_data/synthetic_lidar_simulation_new"
+    output_dir = "/home/artzet_s/code/dataset/synthetic_data/synthetic_lidar_simulation_noised"
+    recompute = False
 
     Viewer.grids.set(False, False, False, False)
 
@@ -131,11 +125,12 @@ if __name__ == "__main__":
         os.mkdir(output_dir)
 
     d = collections.defaultdict(list)
-    for filename in glob.glob("{}/*.bgeom".format(input_dir))[:10]:
+    for filename in glob.glob("{}/*.bgeom".format(input_dir)):
+        basename = os.path.basename(os.path.splitext(filename)[0])
+        output_filename = os.path.join(output_dir, "{}.txt".format(basename))
 
-        data = convert_synthetic_to_point_cloud(filename,
-                                                output_dir=output_dir)
-        break
+        if not os.path.exists(output_filename) or recompute:
+            data = convert_synthetic_to_point_cloud(filename, output_filename)
 
     # d['basename'].append(os.path.basename(os.path.splitext(filename)[0]))
     # d['number_of_apple'].append(data[0])
