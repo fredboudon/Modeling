@@ -26,8 +26,8 @@ def synthetic_LiDAR(scenePlantGL, posLiDAR, pos2look=[0,0,1], jitter = 0.1, rayw
     Generate a synthetic point cloud based on the actual scene of the trees 
     INPUT:
         scenePlantGL: PlantGL scene with the mapplet synthetic tree inside 
-        posLiDAR: List of the estimate position ([x,y,z]) of the lidar in the scene 
-        pos2look: Cartesian points to where the camera have to look 
+        posLiDAR: List of the estimate position of the lidar in the scene, np array ([x,y,z]) 
+        pos2look: Cartesian points to where the camera have to look, np array([x,y,z])
         raywidht: Area took by the simulated light bim
         jitter: ----
         ann: If you wish to pre annotad the measurements 
@@ -81,18 +81,50 @@ def synthetic_LiDAR(scenePlantGL, posLiDAR, pos2look=[0,0,1], jitter = 0.1, rayw
     data = np.concatenate([np_pts, colors], axis=1) # X,Y,Z,R,G,B
     return data
 
-def singleTree_sideMeasurements(lst_scenes):
+def singleTree_sideMeasurements(lst_scenes, d_s2t=3, sense_height=1.5, topView=60):
     """
     From a given tree, take 4 Lidar measurements from each side 
     INPUT:
         lst_scenes: List of PlantGL scenes 
+        d_s2t: Distance from the sensoor to the tree
+        sense_height: Z position of the sensor 
+        topView: Height to the top view scan 
     OUTPUT:
-        dict with the 4 measurements 
+        Point cloud from different views of the tree
     """
-    sc2ret = Scene()
     data2ret = []
-
-    return sc2ret, data2ret
+    l_coord = []
+    # Name list 
+    names = ["front", "back", "right", "left", "top"]
+    # Walk over each tree scene, find the sensor position and scan 
+    for tree in lst_scenes:
+        # It's assume that the single tree is located in the 0,0 coordinates
+        coord0 = [ d_s2t, 0, sense_height] # X aligned
+        coord1 = [-d_s2t, 0, sense_height]
+        coord2 = [ 0, d_s2t, sense_height] # Y alinged 
+        coord3 = [ 0, -d_s2t, sense_height]
+        coord4 = [ 0, 0, topView]
+        # Merge the coordinates 
+        l_coord.append(coord0)
+        l_coord.append(coord1)
+        l_coord.append(coord2)
+        l_coord.append(coord3)
+        l_coord.append(coord4)
+        # Pos to look 
+        _p2l = [0, 0, sense_height*5] 
+        # 
+        for idx, view in enumerate(l_coord):     
+            sens_data = np.array([])
+            # Make the scan 
+            if(idx < 4):
+                sens_data = synthetic_LiDAR(tree, view, pos2look=_p2l, ann=True)
+            else:
+                sens_data = synthetic_LiDAR(tree, view, [0,0,0], ann=True)
+            # Append 
+            data2ret.append( ["%s_%s"%(names[idx], idx), sens_data] )
+        # Reset var 
+        l_coord = []
+    return lst_scenes, data2ret
 
 def singleTree_Line(lst_tree, dx, ntree=5, quality=0, d_l2t=5, angles=[45, -45], sens_height=1.5):
     """
@@ -171,7 +203,7 @@ def singleTree_Line(lst_tree, dx, ntree=5, quality=0, d_l2t=5, angles=[45, -45],
         # Set the lidar to make the measurements 
         for ang in angles:
             # This element gives two measurements at time 
-            lidar_coord = estimate_LiDAR2Tree_coord(lcoord, d_l2t, angle=ang)
+            lidar_coord = estimate_LiDAR2Tree_coord(lcoord, d_l2t, angle=ang, topView=180)
             # Walk over the available measurement  
             for idx, a_coord in enumerate( lidar_coord ):
                 sens_data = synthetic_LiDAR(s2r, [a_coord[0], a_coord[1], sens_height*10], pos2look=[0,0,sens_height], ann=True)
@@ -180,17 +212,20 @@ def singleTree_Line(lst_tree, dx, ntree=5, quality=0, d_l2t=5, angles=[45, -45],
                 #np.savetxt('lidar_idx_%s_ang_%s.txt'%(str(idx), str(ang)), sens_data)
     elif(quality==1): # High res 
         # Get the lidar coordinates between trees and top and front 
-        lidar_coord = estimate_LiDAR2Tree_coord(lcoord, d_l2t, angle=90, m_type=1, d_t2t=dx)
+        lidar_coord = estimate_LiDAR2Tree_coord(lcoord, d_l2t, angle=90, m_type=1, d_t2t=dx, sens_height=sens_height*10, topView=180)
         # Draw the obtained coordinates 
         for idx, a_coord in enumerate(lidar_coord):
             # The first two positions are the extreme centered elements 
             # the other positions are the ones who avance over the crop 
-            if(idx>1):
+            if(idx>2):
                 # It was multiplied by ten because the measurement is in decimenter. and the multiplication by 5 is to ensure that the camera point to
                 # the half of the tree .5
-                sens_data = synthetic_LiDAR(s2r, [a_coord[0], a_coord[1], sens_height*10], pos2look=[a_coord[0], 0, sens_height*5], ann=True )
+                sens_data = synthetic_LiDAR(s2r, [a_coord[0], a_coord[1], a_coord[2]], pos2look=[a_coord[0], 0, sens_height*5], ann=True )
             else:
-                sens_data = synthetic_LiDAR(s2r, [a_coord[0], a_coord[1], sens_height*10], pos2look=[0, a_coord[1], sens_height*5], ann=True )
+                if(idx == 2):
+                    sens_data = synthetic_LiDAR(s2r, [a_coord[0], a_coord[1], a_coord[2]], pos2look=[0, 0, 0], ann=True )
+                else: 
+                    sens_data = synthetic_LiDAR(s2r, [a_coord[0], a_coord[1], a_coord[2]], pos2look=[0, a_coord[1], sens_height*5], ann=True )
             data2wrte.append([ "idx_%s"%str(idx), sens_data ])
             #np.savetxt('lidar_idx_%s.txt'%str(idx), sens_data)
     else:
@@ -198,7 +233,7 @@ def singleTree_Line(lst_tree, dx, ntree=5, quality=0, d_l2t=5, angles=[45, -45],
     #Viewer.display(s2r)
     return s2r, data2wrte
 
-def estimate_LiDAR2Tree_coord(finalTrees, d_l2t, m_type=0, angle=45., d_t2t=3.):
+def estimate_LiDAR2Tree_coord(finalTrees, d_l2t, m_type=0, angle=45., d_t2t=3., topView=60, sens_height=1.5):
     """
     Estimate the coordinates where the lidar have to be set
     based on the coordinates of the last trees added in the scene 
@@ -210,6 +245,7 @@ def estimate_LiDAR2Tree_coord(finalTrees, d_l2t, m_type=0, angle=45., d_t2t=3.):
             0 -> Low Resolution measurement
             1 -> High Resolution measurement 
         d_l2t: Distance from the sensor to the tree, float
+        sens_height: Z position of the sensor 
         angle: The angles is only use when m_type=0, It define the angle from to set the lidar from the tree, float
         d_t2t: Distance between trees float
     OUTPUT:
@@ -239,7 +275,7 @@ def estimate_LiDAR2Tree_coord(finalTrees, d_l2t, m_type=0, angle=45., d_t2t=3.):
             else:
                 l_x = -1
                 l_y = -1
-            l_coord.append([l_x, l_y])
+            l_coord.append([l_x, l_y, sens_height])
     elif(m_type==1):
         # Find the min a and max coordinate over the X axis 
         max_x = int(np.amax( np.array( [finalTrees[0][0], finalTrees[1][0]] ) ))
@@ -247,15 +283,16 @@ def estimate_LiDAR2Tree_coord(finalTrees, d_l2t, m_type=0, angle=45., d_t2t=3.):
         # Eval value 
         e_val = float(max_x)+(d_t2t/2.)
         gd= int(abs(round((abs(max_x)+abs(min_x))/2)))
-        l_coord.append( [max_x+d_l2t, 0] )
-        l_coord.append( [min_x-d_l2t, 0] )
+        l_coord.append( [max_x+d_l2t, 0, sens_height] )
+        l_coord.append( [min_x-d_l2t, 0, sens_height] )
+        l_coord.append( [0, 0, topView] )
         for idx, _ in enumerate(range(int(gd))):
             # Update the coordinate arround the x axis 
             e_val -= d_t2t 
             # Keep The coordinates 
             if(idx > 0 and idx < len(range(int(max_x+(d_t2t/2.)), int(min_x+(d_t2t*2)), int(-d_t2t)))):
-                l_coord.append( [e_val, d_l2t] )
-                l_coord.append( [e_val, -d_l2t] )
+                l_coord.append( [e_val, d_l2t, sens_height] )
+                l_coord.append( [e_val, -d_l2t, sens_height] )
     return l_coord
 
 def prepare_exp(lst_scenes, dxy_tree, ntree=5, d_s2t=2.5, measure_type=0, exp_quality=0):
@@ -278,12 +315,15 @@ def prepare_exp(lst_scenes, dxy_tree, ntree=5, d_s2t=2.5, measure_type=0, exp_qu
     OUTPUT:
         PlantGL generated scene and the list of point clouds 
     """
+    if(len(lst_scenes)< ntree):
+        print("> Error: The number of scenes is less than number of trees")
+        sys.exit()
     # Create the empty scene where the trees are going to be merged 
     scn2ret = Scene()
     pc = []
     # Evaluate the different cases 
     if(measure_type==0):
-        scn2ret, pc = singleTree_sideMeasurements(lst_scenes)
+        scn2ret, pc = singleTree_sideMeasurements(lst_scenes, d_s2t=d_s2t)
     elif(measure_type==1):
        scn2ret, pc = singleTree_Line(lst_scenes, dxy_tree[0], quality=exp_quality, ntree=ntree, d_l2t=d_s2t) 
     #Viewer.display(scn2ret)
@@ -330,12 +370,13 @@ def main(argv):
     print("-> Distance from the Sensor to the trees[m]: %s" %args.d_s2t)
     # The variables are multiplied by 10, because the virtual environment work on decimeters 
     exp, pcs = prepare_exp(lst_tree, (args.d_t2t*10, args.d_t2t*10), measure_type=args.stOmt, exp_quality=args.quality, ntree=args.ntree, d_s2t=args.d_s2t*10)
-    # Display final scene
-    Viewer.display(exp)
+    if(not isinstance(exp, list)):
+        # Display final scene
+        Viewer.display(exp)
     # Write the point clouds -- The retured list pcs = [ idxSensor, Pointcloud ]
-    for pc in pcs:
-        print(" -> Writing file: %s.txt" %pc[0])
-        np.savetxt( "%s.txt"%str(pc[0]), pc[1])
+    for g_idx, pc in enumerate(pcs):
+        print(" -> Writing file: %s_%s.txt" %(str(pc[0]), g_idx))
+        np.savetxt( "%s_%s.txt"%(str(pc[0]), g_idx), pc[1])
     print("Exit")
 if(__name__=="__main__"):
     main(sys.argv)
