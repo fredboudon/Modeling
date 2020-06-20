@@ -48,7 +48,7 @@ def split_pointCloud(pointCloud, objCentralPos=(0,0), d_c2lp=20):
                 obj2ret = np.concatenate( (obj2ret, np.array([pt])) , axis=0)
     return obj2ret
 
-def synthetic_LiDAR(scenePlantGL, posLiDAR, pos2look=[0,0,1], jitter = 0.1, raywidth = 2, ann=False, colorTree = [0,0,0], colorApple=[0,0,255], bAw=True, scale=0.1):
+def synthetic_LiDAR(scenePlantGL, posLiDAR, pos2look=[0,0,1], jitter = 0.1, raywidth = 2, ann=False, colorTree = [0,0,0], colorApple=[255,0,0], bAw=True, scale=0.1):
     """
     Generate a synthetic point cloud based on the actual scene of the trees 
     INPUT:
@@ -75,12 +75,12 @@ def synthetic_LiDAR(scenePlantGL, posLiDAR, pos2look=[0,0,1], jitter = 0.1, rayw
         sc2w = Scene()
         # Color the shape 
         for shape in scenePlantGL:
-            if(isinstance( get_geometry(shape), Sphere)):
+            if(isinstance( get_geometry(shape), Sphere)): # If its an apple/sphere
                 sc2w.add(Shape(shape.geometry,
                                       red,
                                       shape.id,
                                       shape.parentId) )
-            else:
+            else: # Other thing
                 if(bAw==True):
                     sc2w.add(Shape(shape.geometry,
                                         black,
@@ -112,7 +112,11 @@ def synthetic_LiDAR(scenePlantGL, posLiDAR, pos2look=[0,0,1], jitter = 0.1, rayw
     np_pts = np.array(pts.pointList)*scale
     colors = np.array([(c.red, c.green, c.blue) for c in pts.colorList])
     # Merge all in the same file 
-    data = np.concatenate([np_pts, colors], axis=1) # X,Y,Z,R,G,B
+    if(len(np_pts)>0 and len(colors)>0):
+        label = colors[:, 0] >= 200 # Apple mark is 255 in the red channel
+        data = np.concatenate([np_pts, colors, label.reshape(-1, 1)], axis=1)
+    else:
+        data = None
     return data
 
 def singleTree_sideMeasurements(lst_scenes, d_s2t=3, sense_height=1.5, topView=60):
@@ -130,7 +134,7 @@ def singleTree_sideMeasurements(lst_scenes, d_s2t=3, sense_height=1.5, topView=6
     l_coord = []
     merged = np.array([])
     # Name list 
-    names = ["front", "back", "right", "left", "top"]
+    names = ["front", "back", "right", "left"] # "top"
     # Walk over each tree scene, find the sensor position and scan 
     for tree in lst_scenes:
         # It's assume that the single tree is located in the 0,0 coordinates
@@ -138,13 +142,13 @@ def singleTree_sideMeasurements(lst_scenes, d_s2t=3, sense_height=1.5, topView=6
         coord1 = [-d_s2t, 0, sense_height]
         coord2 = [ 0, d_s2t, sense_height] # Y alinged 
         coord3 = [ 0, -d_s2t, sense_height]
-        coord4 = [ 0, 0, topView]
+        #coord4 = [ 0, 0, topView]
         # Merge the coordinates 
         l_coord.append(coord0)
         l_coord.append(coord1)
         l_coord.append(coord2)
         l_coord.append(coord3)
-        l_coord.append(coord4)
+        #l_coord.append(coord4)
         # Pos to look 
         _p2l = [0, 0, sense_height*5] 
         # 
@@ -155,6 +159,11 @@ def singleTree_sideMeasurements(lst_scenes, d_s2t=3, sense_height=1.5, topView=6
                 sens_data = synthetic_LiDAR(tree, view, pos2look=_p2l, ann=True)
             else:
                 sens_data = synthetic_LiDAR(tree, view, [0,0,0], ann=True)
+            # If the scan doesnt have points, just skip the iteration 
+            if(sens_data is None):
+                continue
+            print(sens_data.shape)
+            print(merged.shape)
             # Append 
             data2ret.append( ["%s_%s"%(names[idx], idx), sens_data] )
             # Merge all 
@@ -166,7 +175,7 @@ def singleTree_sideMeasurements(lst_scenes, d_s2t=3, sense_height=1.5, topView=6
         l_coord = []
     return lst_scenes, data2ret, merged 
 
-def singleTree_Line(lst_tree, dx, ntree=5, quality=0, d_l2t=5, angles=[45, -45], sens_height=1.5, _colors=None):
+def singleTree_Line(lst_tree, dx, ntree=5, quality=0, d_l2t=5, angles=[45, -45], sens_height=1.5, _colors=None, ann=True):
     """
     Single tree line 
     INPUT:
@@ -263,7 +272,10 @@ def singleTree_Line(lst_tree, dx, ntree=5, quality=0, d_l2t=5, angles=[45, -45],
             lidar_coord = estimate_LiDAR2Tree_coord(lcoord, d_l2t, angle=ang, topView=180)
             # Walk over the available measurement  
             for idx, a_coord in enumerate( lidar_coord ):
-                sens_data = synthetic_LiDAR(t2l, [a_coord[0], a_coord[1], sens_height*10], pos2look=[0,0,sens_height], ann=True, colorApple=[255,0,0], bAw=False)
+                if(ann):
+                    sens_data = synthetic_LiDAR(t2l, [a_coord[0], a_coord[1], sens_height*10], pos2look=[0,0,sens_height], ann=True, colorApple=[255,0,0], bAw=True)
+                else:
+                    sens_data = synthetic_LiDAR(t2l, [a_coord[0], a_coord[1], sens_height*10], pos2look=[0,0,sens_height], ann=False, colorApple=[255,0,0], bAw=False)
                 # Data to return - reference of the point cloud and the point cloud as np array
                 data2wrte.append( [ "idx_%s_ang_%s"%(str(idx),str(ang)),sens_data] )
                 #np.savetxt('lidar_idx_%s_ang_%s.txt'%(str(idx), str(ang)), sens_data)
@@ -280,35 +292,41 @@ def singleTree_Line(lst_tree, dx, ntree=5, quality=0, d_l2t=5, angles=[45, -45],
         for idx, a_coord in enumerate(lidar_coord):
             # The first two positions are the extreme centered elements 
             # the other positions are the ones who avance over the crop 
-            if(idx>2):
+            if(idx>1): # 2 if top is set 
                 # It was multiplied by ten because the measurement is in decimenter. and the multiplication by 5 is to ensure that the camera point to
                 # the half of the tree .5
-                sens_data = synthetic_LiDAR(t2l, [a_coord[0], a_coord[1], a_coord[2]], pos2look=[a_coord[0], 0, sens_height*5], ann=True, bAw=False )
+                if(ann):
+                    sens_data = synthetic_LiDAR(t2l, [a_coord[0], a_coord[1], a_coord[2]], pos2look=[a_coord[0], 0, sens_height*5], ann=True, bAw=True )
+                else:
+                    sens_data = synthetic_LiDAR(t2l, [a_coord[0], a_coord[1], a_coord[2]], pos2look=[a_coord[0], 0, sens_height*5], ann=True, bAw=False )
             else:
-                if(idx == 2):
-                    sens_data = synthetic_LiDAR(t2l, [a_coord[0], a_coord[1], a_coord[2]], pos2look=[0, 0, 0], ann=True, bAw=False )
-                else: 
-                    sens_data = synthetic_LiDAR(t2l, [a_coord[0], a_coord[1], a_coord[2]], pos2look=[0, a_coord[1], sens_height*5], ann=True, bAw=False )
+                # If top is set 
+                #if(idx == 2):
+                #    sens_data = synthetic_LiDAR(t2l, [a_coord[0], a_coord[1], a_coord[2]], pos2look=[0, 0, 0], ann=True, bAw=False )
+                #else: 
+                #    sens_data = synthetic_LiDAR(t2l, [a_coord[0], a_coord[1], a_coord[2]], pos2look=[0, a_coord[1], sens_height*5], ann=True, bAw=False )
+                if(ann):
+                    sens_data = synthetic_LiDAR(t2l, [a_coord[0], a_coord[1], a_coord[2]], pos2look=[0, a_coord[1], sens_height*5], ann=True, bAw=True )
+                else:
+                    sens_data = synthetic_LiDAR(t2l, [a_coord[0], a_coord[1], a_coord[2]], pos2look=[a_coord[0], 0, sens_height*5], ann=False, bAw=False )
+            # If the scan doesnt have point just skip the iteration 
+            if(sens_data is None):
+                continue
             # Merge the obtained data 
             if(idx == 0):
                 merged = sens_data
             else:
                 merged = np.concatenate( (merged, sens_data), axis=0 )
             data2wrte.append([ "idx_%s"%str(idx), sens_data ])
-        #print("merged--split")
-        #split_pointCloud(merged)
-        #np.savetxt('lidar_idx_merged_single.txt', merged)
     else:
         pass
-    #sys.exit()
-    #Viewer.display(s2r)
     return s2r, data2wrte, merged
 
-def estimate_LiDAR2Tree_coord(finalTrees, d_l2t, m_type=0, angle=45., d_t2t=3., topView=60, sens_height=1.5):
+def estimate_LiDAR2Tree_coord(finalTrees, d_l2t, m_type=0, angle=45., d_t2t=3., topView=60, sens_height=1.5,):
     """
     Estimate the coordinates where the lidar have to be set
     based on the coordinates of the last trees added in the scene 
-    and the desired distance a position from the lidar to the tree
+    and the desired distance from the lidar to the tree
 
     INPUT:
         finalTree: List of the coordinated of the bottom left and top right trees [ [x,y], [x,y]]
@@ -317,7 +335,7 @@ def estimate_LiDAR2Tree_coord(finalTrees, d_l2t, m_type=0, angle=45., d_t2t=3., 
             1 -> High Resolution measurement 
         d_l2t: Distance from the sensor to the tree, float
         sens_height: Z position of the sensor 
-        angle: The angles is only use when m_type=0, It define the angle from to set the lidar from the tree, float
+        angle: The angles is only use when m_type=0, It defines the rotation angle over the Z axis of the tree and the axis of the sensor , float
         d_t2t: Distance between trees float
     OUTPUT:
         LiDAR list of coordinates  
@@ -352,21 +370,22 @@ def estimate_LiDAR2Tree_coord(finalTrees, d_l2t, m_type=0, angle=45., d_t2t=3., 
         max_x = int(np.amax( np.array( [finalTrees[0][0], finalTrees[1][0]] ) ))
         min_x = int(np.amin( np.array( [finalTrees[0][0], finalTrees[1][0]] ) ))
         # Eval value 
-        e_val = float(max_x)+(d_t2t/2.)
-        gd= int(abs(round((abs(max_x)+abs(min_x))/2)))
-        l_coord.append( [max_x+d_l2t, 0, sens_height] )
-        l_coord.append( [min_x-d_l2t, 0, sens_height] )
-        l_coord.append( [0, 0, topView] )
+        e_val = float(max_x)#+(d_t2t/2.)
+        gd= int(abs(round((abs(max_x)+abs(min_x))/2)))+1 # Correct this element
+        l_coord.append( [max_x+d_l2t, 0, sens_height] ) # Aligned sensors with the trees at front and back of the row
+        l_coord.append( [min_x-d_l2t, 0, sens_height] ) # 
+        #l_coord.append( [0, 0, topView] )
         for idx, _ in enumerate(range(int(gd))):
             # Update the coordinate arround the x axis 
-            e_val -= d_t2t 
+            #e_val -= d_t2t 
             # Keep The coordinates 
-            if(idx > 0 and idx < len(range(int(max_x+(d_t2t/2.)), int(min_x+(d_t2t*2)), int(-d_t2t)))):
+            if(idx > 0 and idx < len(range(int(max_x+(d_t2t/2.)), int(min_x-(d_t2t)), int(-d_t2t)))):
                 l_coord.append( [e_val, d_l2t, sens_height] )
                 l_coord.append( [e_val, -d_l2t, sens_height] )
+            e_val -= d_t2t 
     return l_coord
 
-def prepare_exp(lst_scenes, dxy_tree, ntree=5, d_s2t=2.5, measure_type=0, exp_quality=0, scale=0.1):
+def prepare_exp(lst_scenes, dxy_tree, ntree=5, d_s2t=2.5, measure_type=0, exp_quality=0, scale=0.1, ann=0):
     """
     Merge the given synthetic trees in one scene base on the initial Field Measurements
 
@@ -386,7 +405,7 @@ def prepare_exp(lst_scenes, dxy_tree, ntree=5, d_s2t=2.5, measure_type=0, exp_qu
     OUTPUT:
         PlantGL generated scene and the list of point clouds 
     """
-    if(len(lst_scenes)< ntree):
+    if(len(lst_scenes)<ntree):
         print("> Error: The number of scenes is less than number of trees")
         sys.exit()
     # Create the empty scene where the trees are going to be merged 
@@ -397,7 +416,7 @@ def prepare_exp(lst_scenes, dxy_tree, ntree=5, d_s2t=2.5, measure_type=0, exp_qu
     if(measure_type==0):
         scn2ret, pc, merged = singleTree_sideMeasurements(lst_scenes, d_s2t=d_s2t)
     elif(measure_type==1):
-       scn2ret, pc, merged = singleTree_Line(lst_scenes, dxy_tree[0], quality=exp_quality, ntree=ntree, d_l2t=d_s2t) 
+       scn2ret, pc, merged = singleTree_Line(lst_scenes, dxy_tree[0], quality=exp_quality, ntree=ntree, d_l2t=d_s2t, ann=True if ann==1 else False) 
     #Viewer.display(scn2ret)
     return scn2ret, pc, merged
 
@@ -421,10 +440,6 @@ def split_trees(treePointCloud, label=None, rowLabel=[4,6]):
                     dicPos[idx] = np.array([pt])
                 else:
                     dicPos[idx] = np.concatenate( ( dicPos[idx], np.array([pt]) ), axis=0 )
-        #sys.exit()
-    #print(dicPos.keys())
-    #for i in dicPos.keys():
-    #    np.savetxt( "%stest.txt"%str(i), dicPos[i])
     return dicPos
 
 
@@ -486,6 +501,7 @@ def main(argv):
     parser.add_argument("--d_s2t", type=float, help="Distance from the sensor to the tree [meters], double", default=10)
     parser.add_argument("--d_t2t", type=float, help="Distance between trees [meters], double", default=1.8)
     parser.add_argument("--winter", type=int, help="Winter tree 0, Summer tree 1", default=1)
+    parser.add_argument("--ann", type=int, default=0, help="Return the annotated point cloud [0] or the colored trees [1]")
     args = parser.parse_args()
     # Init my obj 
     fh = fileHandler()
@@ -498,65 +514,78 @@ def main(argv):
     if(len(lst_bgeom)<args.ntree):
         print("ERROR: Not enough tree to successfully represent the requested scene, found files %i, requested files %i" %(len(lst_bgeom), args.ntree))
         sys.exit()
-    # Load the files and set the requested scene 
-    for idx, usrScene in enumerate(lst_bgeom, start=1):
-        print("\r-> Loading[%i/%i]: %s" %(idx,len(lst_bgeom), usrScene))
-        # Path and name of the actual scene 
-        _nme_scene = os.path.join(args.path2trees, usrScene)
-        # Load the indepentend scene 
-        a_scene = Scene(_nme_scene)
-        # Remove the floor and the text from the scene 
-        cleanTree = pst.removeTextFromScene(a_scene)
-        if(args.winter==1):
-            cleanTree = get_singleOrgan(cleanTree, "wood")
+    # Get the n bins that can be generated with the found files
+    nbins = int(len(lst_bgeom)/args.ntree)
+    cntr = 0
+    # Load the files, create the desired scene and write the point cloud
+    for idx, _ in enumerate(range(nbins)):# Generate the sets
+        start = 0
+        end = 0
+        # Verify the set -- took in care the iter
+        if(idx==0):
+            start = cntr
+            end   = cntr+(args.ntree-1)
         else:
-            pass
-        #Viewer.display(cleanTree)
-        # Apped the tree 
-        lst_tree.append(cleanTree)
-    print("-> Loaded scenes: %i" %len(lst_tree))
-    print("-> Trees to set: %s" %str(args.ntree))
-    print("-> Selected quality: %s" %("High resolution" if args.quality == 1 else "Low resolution"))
-    print("-> Experiment type : %s" %("Tree row" if args.stOmt == 1 else "Single tree"))
-    print("-> Distance between trees[m]: %s" %str(args.d_t2t))
-    print("-> Distance from the Sensor to the trees[m]: %s" %args.d_s2t)
-    # Path to write 
-    if(not os.path.isdir(args.output)):
-        os.mkdir(args.output)
-    # Split the cleaned trees to get the dataset 
-    for i in range(0, len(lst_tree), args.ntree):
+            start = cntr if idx==1 else cntr+1
+            end   = cntr+(args.ntree)
+        cntr += args.ntree
+        #print(start, end)
+        # Clean the scene 
+        lst_tree = []
+        # Load and clean the scene 
+        for m_idx, data_idx in enumerate(range(start, end+1), start=1):
+            print(" -> Loading[%i]: %s" %((m_idx), lst_bgeom[data_idx]))
+            # Full path to the file 
+            fpath = os.path.join(args.path2trees, lst_bgeom[data_idx])
+            # Load the scene 
+            a_scene = Scene(fpath)
+            # Remove the letters and the floor
+            cleanTree = pst.removeTextFromScene(a_scene)
+            if(args.winter==1):
+                cleanTree = get_singleOrgan(cleanTree, "wood")
+            else:
+                pass
+            # Append the scenes to process 
+            lst_tree.append(cleanTree)
+        print("-> Group[%i/%i]" %(idx+1, nbins))
+        print(" -> Loaded scenes: %i" %len(lst_tree))
+        print(" -> Trees to set: %s" %str(args.ntree))
+        print(" -> Selected quality: %s" %("High resolution" if args.quality == 1 else "Low resolution"))
+        print(" -> Experiment type : %s" %("Tree row" if args.stOmt == 1 else "Single tree"))
+        print(" -> Distance between trees[m]: %s" %str(args.d_t2t))
+        print(" -> Distance from the Sensor to the trees[m]: %s" %args.d_s2t)
+        #continue
+            # Path to write 
+        if(not os.path.isdir(args.output)):
+            os.mkdir(args.output)
         # Path to actual set 
-        p2s = os.path.join( args.output, str(i) )
-        if(i+args.ntree < len(lst_tree)):
-            if( not os.path.isdir( p2s ) ):
-                os.mkdir(p2s)
-            # Prepare the test with the splited elements 
-            _, pcs, merged = prepare_exp(lst_tree[i:i+args.ntree], (args.d_t2t*10, args.d_t2t*10), measure_type=args.stOmt, exp_quality=args.quality, ntree=args.ntree, d_s2t=args.d_s2t*10)
-            # Split the merged scene -- Each tree is set in a dictionary
-            singTree = split_trees(merged)
-            # Get the folder to splited elements
-            p2splt = os.path.join( p2s, "splited/" )
-            # If doesnt exist create folder 
-            if(not os.path.isdir( p2splt ) ):
-                os.mkdir(p2splt)
-            # Write the splited trees 
-            for d_idx in singTree.keys():
-                # Get the tree
-                s_a_pc = singTree[d_idx]
-                np.savetxt( "%s/splited_tree_idx_%s.txt"%(p2splt, d_idx), s_a_pc)
-        else:
-            continue
-        # Write the indepented elements 
+        p2s = os.path.join( args.output, "group_%i"%(idx) )
+        if( not os.path.isdir( p2s ) ):
+            os.mkdir(p2s)
+        # Prepare the test with the splited elements 
+        _, pcs, merged = prepare_exp(lst_tree, (args.d_t2t*10, args.d_t2t*10), measure_type=args.stOmt, exp_quality=args.quality, ntree=args.ntree, d_s2t=args.d_s2t*10, ann=args.ann)
+        # Split the merged scene -- Each tree is set in a dictionary
+        singTree = split_trees(merged)
+        # Get the folder to splited elements
+        p2splt = os.path.join( p2s, "splited/" )
+        # If doesnt exist create folder 
+        if(not os.path.isdir( p2splt ) ):
+            os.mkdir(p2splt)
+        # Write the splited trees 
+        for d_idx in singTree.keys():
+            # Get the tree
+            s_a_pc = singTree[d_idx]
+            np.savetxt( "%s/splited_tree_idx_%s.txt"%(p2splt, d_idx), s_a_pc)
+        #  Write the indepented elements 
         for g_idx, pc in enumerate(pcs):
             print(" -> Writing file: %s/%s_%s.txt" %(p2s,str(pc[0]), g_idx))
-            np.savetxt( "%s/%s_%s_%s.txt"%(p2s,str(i),str(pc[0]), g_idx), pc[1])
+            np.savetxt( "%s/%s_%s_%s.txt"%(p2s,str(idx),str(pc[0]), g_idx), pc[1])
         if(args.quality==0 and args.stOmt == 1):
-            np.savetxt( "%s/%s_LowResolution_treeRow_merged.txt"%(p2s, str(i)), merged)
+            np.savetxt( "%s/%s_LowResolution_treeRow_merged.txt"%(p2s, str(idx)), merged)
         elif(args.quality==1 and args.stOmt == 1):
-            np.savetxt( "%s/%s_HighResolution_treeRow_merged.txt"%(p2s,str(i)), merged)
-        elif( (args.quality==1 or args.quality==0) and  args.stOmt == 1):
-            np.savetxt( "%s/%s_singleTree_merged.txt"%(p2s,str(i)), merged)
-
+            np.savetxt( "%s/%s_HighResolution_treeRow_merged.txt"%(p2s,str(idx)), merged)
+        elif( (args.quality==1 or args.quality==0) and  args.stOmt == 0):
+            np.savetxt( "%s/%s_singleTree_merged.txt"%(p2s,str(idx)), merged)
     print("Exit")
     sys.exit(0)
 if(__name__=="__main__"):
