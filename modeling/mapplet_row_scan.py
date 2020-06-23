@@ -11,7 +11,8 @@ from modeling import *
 from openalea.plantgl.all import *
 from tools.fileHandler import fileHandler
 from tools.prepareSynthetic import prepareSynthetic
-
+import multiprocessing
+from joblib import Parallel, delayed
 
 def get_geometry(sh):
     if hasattr(sh, 'geometry'):
@@ -70,27 +71,29 @@ def synthetic_LiDAR(scenePlantGL, posLiDAR, pos2look=[0,0,1], jitter = 0.1, rayw
     _cam_p, _cam_r, _ = pgl.Viewer.camera.getPosition()
     # Preprocess the scene -- High light the appeles and set the other elements in black  
     sc2w = Scene()
-    if(ann):
+    #if(ann):
         # Scene to work 
-        sc2w = Scene()
+    #    sc2w = Scene()
         # Color the shape 
-        for shape in scenePlantGL:
-            if(isinstance( get_geometry(shape), Sphere)): # If its an apple/sphere
-                sc2w.add(Shape(shape.geometry,
-                                      red,
-                                      shape.id,
-                                      shape.parentId) )
-            else: # Other thing
-                if(bAw==True):
-                    sc2w.add(Shape(shape.geometry,
-                                        black,
-                                        shape.id,
-                                        shape.parentId)) 
-                else:
-                    sc2w.add(Shape(shape.geometry,
-                                        shape.appearance,
-                                        shape.id,
-                                        shape.parentId)) 
+    #    for shape in scenePlantGL:
+    #        if(isinstance( get_geometry(shape), Sphere)): # If its an apple/sphere
+    #            sc2w.add(Shape(shape.geometry,
+    #                                  red,
+    #                                  shape.id,
+    #                                  shape.parentId) )
+    #        else: # Other thing
+    #            if(bAw==True):
+    #                sc2w.add(Shape(shape.geometry,
+    #                                    black,
+    #                                    shape.id,
+    #                                    shape.parentId)) 
+    #            else:
+    #                sc2w.add(Shape(shape.geometry,
+    #                                    shape.appearance,
+    #                                    shape.id,
+    #                                    shape.parentId)) 
+    #else:
+    sc2w = scenePlantGL
     Viewer.grids.set(False, False, False, False)
      # Shut down the light 
     Viewer.light.enabled = False
@@ -113,11 +116,13 @@ def synthetic_LiDAR(scenePlantGL, posLiDAR, pos2look=[0,0,1], jitter = 0.1, rayw
     colors = np.array([(c.red, c.green, c.blue) for c in pts.colorList])
     # Merge all in the same file 
     if(len(np_pts)>0 and len(colors)>0):
-        label = colors[:, 0] >= 200 # Apple mark is 255 in the red channel
-        data = np.concatenate([np_pts, colors, label.reshape(-1, 1)], axis=1)
+        #label = colors[:, 0] >= 200 # Apple mark is 255 in the red channel
+        #data = np.concatenate([np_pts, colors, label.reshape(-1, 1)], axis=1)
+        #print("Colors: ", np.unique(colors))
+        data = np.concatenate([np_pts, colors], axis=1)
     else:
         data = None
-    return data
+    return np.array(data)
 
 def singleTree_sideMeasurements(lst_scenes, d_s2t=3, sense_height=1.5, topView=60):
     """
@@ -162,8 +167,6 @@ def singleTree_sideMeasurements(lst_scenes, d_s2t=3, sense_height=1.5, topView=6
             # If the scan doesnt have points, just skip the iteration 
             if(sens_data is None):
                 continue
-            print(sens_data.shape)
-            print(merged.shape)
             # Append 
             data2ret.append( ["%s_%s"%(names[idx], idx), sens_data] )
             # Merge all 
@@ -221,30 +224,51 @@ def singleTree_Line(lst_tree, dx, ntree=5, quality=0, d_l2t=5, angles=[45, -45],
     merged = []
     s2r = Scene()
     t2l = Scene()
+    lck = 0
+    #red = Material([255, 0, 0])
     if(_colors is None):
-        _colors = [ [0, 25, 0], [0, 75, 0], [0, 150, 0], [0, 0, 50], [0, 0, 100] ]
+        # 220, 250, 100, 200, 110
+        _colors = [ [0, 50, 0], [0, 102, 0], [0, 125, 0], [0, 0, 56], [0, 0, 110] ]
     # Load and merge each tree in one scene 
     for idx, tree in enumerate(lst_tree, start=1):
-        # Merge the tree in the scene, Walk over all shape an put them in the new scene 
+        # IF there is an apple merge the color of the tree and the apple
+        mi_r = [255, 0, 0]
+        mCol = []
+        for mmc in range(3):
+            mCol.append(  mi_r[mmc]+_colors[idx-1][mmc]  )
+        nCol = Material(mCol)
+        # Evaluate each shape
         for a_shape in tree:
             if( (idx%2) == 0 ):
+                if(isinstance( get_geometry(a_shape), Sphere)): # If its an apple/sphere
+                    t2l.add(Shape(Translated(x[0],0,0,a_shape.geometry),
+                                        nCol,
+                                        a_shape.id,
+                                        a_shape.parentId) )
+                else:
+                    # Independet tree colored 
+                    t2l.add( Shape( Translated(x[0],0,0,a_shape.geometry),
+                                    Material(_colors[idx-1]), 
+                                    a_shape.id,
+                                    a_shape.parentId) )
                 # Original tree
                 s2r.add( Shape( Translated(x[0],0,0,a_shape.geometry),
                                 a_shape.appearance, 
-                                a_shape.id,
-                                a_shape.parentId) )
-                # Independet tree colored 
-                t2l.add( Shape( Translated(x[0],0,0,a_shape.geometry),
-                                Material(_colors[idx-1]), 
                                 a_shape.id,
                                 a_shape.parentId) )
             else:
                 s2r.add( Shape( Translated(x[1],0,0,a_shape.geometry),
                                 a_shape.appearance, 
                                 a_shape.id,
-                                a_shape.parentId) )    
-                # Independet tree colored 
-                t2l.add( Shape( Translated(x[1],0,0,a_shape.geometry),
+                                a_shape.parentId) )
+                if(isinstance( get_geometry(a_shape), Sphere)): # If its an apple/sphere
+                    t2l.add(Shape(Translated(x[1],0,0,a_shape.geometry),
+                                        nCol,
+                                        a_shape.id,
+                                        a_shape.parentId) ) 
+                else:  
+                    # Independet tree colored 
+                    t2l.add( Shape( Translated(x[1],0,0,a_shape.geometry),
                                 Material(_colors[idx-1]), 
                                 a_shape.id,
                                 a_shape.parentId) )            
@@ -259,6 +283,8 @@ def singleTree_Line(lst_tree, dx, ntree=5, quality=0, d_l2t=5, angles=[45, -45],
             break
     # The viewes has to be activated before launch the scan  
     Viewer.grids.set(False, False, False, False)
+    #Viewer.frameGL.setSize(420, 300)
+    #Viewer.camera.setViewAngle()
      # Shut down the light 
     Viewer.light.enabled = False
     Viewer.display(t2l)
@@ -273,6 +299,7 @@ def singleTree_Line(lst_tree, dx, ntree=5, quality=0, d_l2t=5, angles=[45, -45],
             # Walk over the available measurement  
             for idx, a_coord in enumerate( lidar_coord ):
                 if(ann):
+                    # WARNING!!! REMOVE THE ANNOTATION OF THE GENERIC LIDAR METHOD
                     sens_data = synthetic_LiDAR(t2l, [a_coord[0], a_coord[1], sens_height*10], pos2look=[0,0,sens_height], ann=True, colorApple=[255,0,0], bAw=True)
                 else:
                     sens_data = synthetic_LiDAR(t2l, [a_coord[0], a_coord[1], sens_height*10], pos2look=[0,0,sens_height], ann=False, colorApple=[255,0,0], bAw=False)
@@ -313,13 +340,27 @@ def singleTree_Line(lst_tree, dx, ntree=5, quality=0, d_l2t=5, angles=[45, -45],
             if(sens_data is None):
                 continue
             # Merge the obtained data 
-            if(idx == 0):
-                merged = sens_data
+            if(lck == 0):
+                if(len(sens_data.shape)>1):
+                    merged = sens_data
+                    lck=1
+                else:
+                    #print("m empty")
+                    continue
             else:
-                merged = np.concatenate( (merged, sens_data), axis=0 )
+                if(len(sens_data.shape)>1 and lck>0):
+                    merged = np.concatenate( (merged, sens_data), axis=0 )
+                else:
+                    #print("n empty")
+                    continue
             data2wrte.append([ "idx_%s"%str(idx), sens_data ])
     else:
         pass
+    # Add the label to the merged scene for the apple 
+        #label = colors[:, 0] >= 200 # Apple mark is 255 in the red channel
+        #data = np.concatenate([np_pts, colors, label.reshape(-1, 1)], axis=1)
+    label = merged[:, 3] >= 200
+    merged = np.concatenate([merged, label.reshape(-1, 1)], axis=1)
     return s2r, data2wrte, merged
 
 def estimate_LiDAR2Tree_coord(finalTrees, d_l2t, m_type=0, angle=45., d_t2t=3., topView=60, sens_height=1.5,):
@@ -420,26 +461,51 @@ def prepare_exp(lst_scenes, dxy_tree, ntree=5, d_s2t=2.5, measure_type=0, exp_qu
     #Viewer.display(scn2ret)
     return scn2ret, pc, merged
 
-def split_trees(treePointCloud, label=None, rowLabel=[4,6]):
+def split_trees(treePointCloud, label=None, rowLabel=[3,6], nbin=1, nprocess=6):
     """
     Split the trees based on their defined colors 
+
+    Note: The color captured by the lidar is de rgb[Defined in variable _colors]*2
+
+    # 220, 250, 100, 200, 110
+        _colors = [ [0, 50, 0], [0, 102, 0], [0, 125, 0], [0, 0, 56], [0, 0, 110] ]
     """
     evalColor = [] 
     dicPos = {}
+    my_bins = int(treePointCloud.shape[0]/nprocess)
+    pos2eval = []
+    pos = 0
+    # If the bin to evaluate is bigger than the available bins just return none 
+    if(my_bins < nbin):
+        return None
+    # Estimate the range of bins 
+    for _ in range(nprocess):
+        # Save the initial position of the bin
+        pos2eval.append(pos)
+        # Update the new position of the bin
+        pos += my_bins    
     if(label is None):
-        evalColor = [ 25, 75, 150, 50, 100  ] # G G G B B
+        # This list is set in this order, to ensure that the first and last tree are in the init and end of the dict
+        evalColor = [ 220, 250, 100, 204, 112  ] # B G G G B
     else:
         evalColor = label
+    # Verify end idx -- Maybe there is a memory problem because i'm passing all the point cloud and split inside the function
+    end = treePointCloud.shape[0] if (pos2eval[nbin]+my_bins > treePointCloud.shape[0] ) else pos2eval[nbin]+my_bins
+    #print(np.unique(treePointCloud[:,3:6]))
+    #sys.exit()
     # Walk over the points 
-    for pt in treePointCloud:
+    for pt in treePointCloud[pos2eval[nbin]:end]:
         # Walk over the label 
         for idx, lbl in enumerate(evalColor):
-            #print(lbl, pt[rowLabel[0]:rowLabel[1]])
-            if(lbl in pt[rowLabel[0]:rowLabel[1]]):
+            if(lbl in pt[rowLabel[0]:rowLabel[1]] or lbl/2 in pt[rowLabel[0]:rowLabel[1]]):
                 if(idx not in dicPos):
                     dicPos[idx] = np.array([pt])
                 else:
                     dicPos[idx] = np.concatenate( ( dicPos[idx], np.array([pt]) ), axis=0 )
+                break
+            else: # Unknow 
+                #print(idx,pt[rowLabel[0]:rowLabel[1]])
+                continue
     return dicPos
 
 
@@ -532,6 +598,7 @@ def main(argv):
         #print(start, end)
         # Clean the scene 
         lst_tree = []
+        lst_name = []
         # Load and clean the scene 
         for m_idx, data_idx in enumerate(range(start, end+1), start=1):
             print(" -> Loading[%i]: %s" %((m_idx), lst_bgeom[data_idx]))
@@ -547,6 +614,7 @@ def main(argv):
                 pass
             # Append the scenes to process 
             lst_tree.append(cleanTree)
+            lst_name.append(lst_bgeom[data_idx])
         print("-> Group[%i/%i]" %(idx+1, nbins))
         print(" -> Loaded scenes: %i" %len(lst_tree))
         print(" -> Trees to set: %s" %str(args.ntree))
@@ -554,7 +622,6 @@ def main(argv):
         print(" -> Experiment type : %s" %("Tree row" if args.stOmt == 1 else "Single tree"))
         print(" -> Distance between trees[m]: %s" %str(args.d_t2t))
         print(" -> Distance from the Sensor to the trees[m]: %s" %args.d_s2t)
-        #continue
             # Path to write 
         if(not os.path.isdir(args.output)):
             os.mkdir(args.output)
@@ -565,17 +632,42 @@ def main(argv):
         # Prepare the test with the splited elements 
         _, pcs, merged = prepare_exp(lst_tree, (args.d_t2t*10, args.d_t2t*10), measure_type=args.stOmt, exp_quality=args.quality, ntree=args.ntree, d_s2t=args.d_s2t*10, ann=args.ann)
         # Split the merged scene -- Each tree is set in a dictionary
-        singTree = split_trees(merged)
+        p_torun = 10
+        print("-> Merged scene is going to be split")
+        processed_list = Parallel(n_jobs=p_torun)(delayed(split_trees)(merged, nbin=i, nprocess=p_torun) for i in range( p_torun ))
+        # Concatenate the mutliple dicts positions 
+        m_dict = {}
+        for output_p in processed_list: # List of dictionaries -- splitted tree 
+            for d_key in output_p.keys():  # tree 
+                if(d_key not in m_dict.keys()):
+                    m_dict[d_key] = output_p[d_key]
+                else:
+                    m_dict[d_key] = np.concatenate( (m_dict[d_key], output_p[d_key]  ) )
+        #singTree = split_trees(merged, nbin=i, nprocess=p_torun)
+        print("  -> OK")
         # Get the folder to splited elements
         p2splt = os.path.join( p2s, "splited/" )
         # If doesnt exist create folder 
         if(not os.path.isdir( p2splt ) ):
             os.mkdir(p2splt)
         # Write the splited trees 
-        for d_idx in singTree.keys():
+        # WARNING!! Write a function to order in the good way the trees 
+        ordr2xrt = [4, 2, 0, 1, 3]
+        for d_idx, ow in zip(m_dict.keys(), ordr2xrt):
+            moname = lst_name[ow]
+            mname = moname[0:len(moname)-6]
             # Get the tree
-            s_a_pc = singTree[d_idx]
-            np.savetxt( "%s/splited_tree_idx_%s.txt"%(p2splt, d_idx), s_a_pc)
+            s_a_pc = m_dict[d_idx]
+            s_a_pc = np.delete(s_a_pc, 3, 1) # Delete R
+            s_a_pc = np.delete(s_a_pc, 3, 1) # Delete G
+            s_a_pc = np.delete(s_a_pc, 3, 1) # Delete B
+            #print(s_a_pc[:,6].shape)
+            #print(np.unique(s_a_pc[:,6]))
+
+            #print(s_a_pc.shape)
+            #sys.exit() 
+            #np.savetxt( "%s/splited_tree_idx_%s.txt"%(p2splt, d_idx), s_a_pc)
+            np.savetxt( "%s/%i_%s.txt"%(p2splt, d_idx,mname), s_a_pc)
         #  Write the indepented elements 
         for g_idx, pc in enumerate(pcs):
             print(" -> Writing file: %s/%s_%s.txt" %(p2s,str(pc[0]), g_idx))
